@@ -9,3 +9,133 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+enum Role {
+  STUDENT
+  TUTOR
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role
+  firstName    String   @map("first_name")
+  lastName     String   @map("last_name")
+  avatarUrl    String?  @map("avatar_url")
+  timezone     String   @default("UTC")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tutorProfile    TutorProfile?
+  bookingsAsTutor Booking[]     @relation("TutorBookings")
+  bookingsAsStudent Booking[]   @relation("StudentBookings")
+
+  @@map("users")
+}
+
+model TutorProfile {
+  id         String  @id @default(uuid())
+  userId     String  @unique @map("user_id")
+  bio        String?
+  hourlyRate Float   @map("hourly_rate")
+  meetingLink String? @map("meeting_link")
+  isVerified Boolean @default(false) @map("is_verified")
+
+  user         User                       @relation(fields: [userId], references: [id])
+  subjects     TutorSubject[]
+  weekly       TutorWeeklyAvailability[]
+  overrides    TutorAvailabilityOverride[]
+  reviews      Review[]
+
+  @@map("tutor_profiles")
+}
+
+model Subject {
+  id   String @id @default(uuid())
+  name String @unique
+
+  tutors   TutorSubject[]
+  bookings Booking[]
+
+  @@map("subjects")
+}
+
+model TutorSubject {
+  tutorId   String @map("tutor_id")
+  subjectId String @map("subject_id")
+
+  tutor   TutorProfile @relation(fields: [tutorId], references: [id])
+  subject Subject      @relation(fields: [subjectId], references: [id])
+
+  @@id([tutorId, subjectId])
+  @@map("tutor_subjects")
+}
+
+model TutorWeeklyAvailability {
+  id        String @id @default(uuid())
+  tutorId   String @map("tutor_id")
+  dayOfWeek Int    @map("day_of_week") // 0=Sun, 1=Mon ... 6=Sat
+  startTime String @map("start_time")  // "09:00"
+  endTime   String @map("end_time")    // "17:00"
+
+  tutor TutorProfile @relation(fields: [tutorId], references: [id])
+
+  @@unique([tutorId, dayOfWeek, startTime])
+  @@map("tutor_weekly_availability")
+}
+
+model TutorAvailabilityOverride {
+  id          String  @id @default(uuid())
+  tutorId     String  @map("tutor_id")
+  date        DateTime @db.Date
+  isAvailable Boolean  @map("is_available") // false = day off, true = extra day
+  startTime   String?  @map("start_time")
+  endTime     String?  @map("end_time")
+
+  tutor TutorProfile @relation(fields: [tutorId], references: [id])
+
+  @@unique([tutorId, date])
+  @@map("tutor_availability_overrides")
+}
+
+model Booking {
+  id         String        @id @default(uuid())
+  tutorId    String        @map("tutor_id")
+  studentId  String        @map("student_id")
+  subjectId  String        @map("subject_id")
+  startTime  DateTime      @map("start_time")
+  endTime    DateTime      @map("end_time")
+  status     BookingStatus @default(PENDING)
+  meetingUrl String?       @map("meeting_url")
+  notes      String?
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  tutor   User    @relation("TutorBookings", fields: [tutorId], references: [id])
+  student User    @relation("StudentBookings", fields: [studentId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+  review  Review?
+
+  @@map("bookings")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  bookingId String   @unique @map("booking_id")
+  tutorId   String   @map("tutor_id")
+  rating    Int      // 1 to 5
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  booking Booking      @relation(fields: [bookingId], references: [id])
+  tutor   TutorProfile @relation(fields: [tutorId], references: [id])
+
+  @@map("reviews")
+} 
