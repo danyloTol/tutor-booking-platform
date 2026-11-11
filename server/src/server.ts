@@ -1,3 +1,4 @@
+import routes from "./routes";
 import express from "express";
 import cors from "cors";
 import { env } from "./config/env";
@@ -14,8 +15,7 @@ app.get("/", (req, res) => {
   res.json({ status: "ok", message: "Tutor Booking API is running" });
 });
 
-// TODO: Mount API routes here
-// app.use("/api", routes);
+app.use("/api", routes);
 
 // Error handler (must be last)
 app.use(errorHandler);
